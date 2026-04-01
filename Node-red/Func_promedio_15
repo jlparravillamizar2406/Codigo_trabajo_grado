@@ -1,0 +1,105 @@
+// -------------------------------------------------
+// BUFFER
+// -------------------------------------------------
+if (!context.buffer) {
+    context.buffer = [];
+}
+
+context.buffer.push(msg.payload);
+
+// -------------------------------------------------
+if (context.buffer.length === 15) {
+
+    let result = {};
+    let keys = Object.keys(context.buffer[0]);
+
+    keys.forEach(key => {
+
+        let values = context.buffer.map(sample => sample[key]);
+        values = values.filter(v => typeof v === "number");
+
+        if (values.length < 3) return;
+
+        values.sort((a, b) => a - b);
+        let trimmed = values.slice(1, values.length - 1);
+
+        let sum = trimmed.reduce((a, b) => a + b, 0);
+        result[key] = sum / trimmed.length;
+    });
+
+    context.buffer = [];
+
+    // -------------------------------------------------
+    // OD GLOBAL
+    // -------------------------------------------------
+    let od = global.get("OD_manual");
+
+    if (od === undefined) {
+        od = 7.66;
+        global.set("OD_manual", od);
+        node.warn("OD inicializado en promedio: " + od);
+    }
+
+    let experiment = global.get("experiment") || "exp1";
+
+    // -------------------------------------------------
+    // SALIDAS
+    // -------------------------------------------------
+
+    let msg_param = {
+        measurement: "parametros_sensor",
+        payload: {
+            Time: Number(result.time),
+            Ganancia: Number(result.gain),
+            Inttime: Number(result.intTime),
+            experiment: experiment
+        }
+    };
+
+    let msg_espectro = {
+        measurement: "espectro_od",
+        payload: {
+            experiment: experiment,
+
+            A: Number(result.A),
+            B: Number(result.B),
+            C: Number(result.C),
+            D: Number(result.D),
+            E: Number(result.E),
+            F: Number(result.F),
+            G: Number(result.G),
+            H: Number(result.H),
+
+            R: Number(result.R),
+            I: Number(result.I),
+            S: Number(result.S),
+            J: Number(result.J),
+            T: Number(result.T),
+            U: Number(result.U),
+            V: Number(result.V),
+            W: Number(result.W),
+
+            TempBMP: Number(result.TempBMP),
+            TempDS: Number(result.TempDS),
+
+            K: Number(result.K),
+            L: Number(result.L),
+
+            OD: Number(od)
+        }
+    };
+
+    let msg_ambiental = {
+        measurement: "ambiental",
+        payload: {
+            experiment: experiment,
+            TempBMP: Number(result.TempBMP),
+            Pressure: Number(result.Pressure),
+            TempDS: Number(result.TempDS)
+        }
+    };
+
+    return [msg_param, msg_espectro, msg_ambiental];
+}
+
+return null;
