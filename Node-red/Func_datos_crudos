@@ -1,0 +1,60 @@
+// -------------------------------------------------
+// OBTENER OD GLOBAL
+// -------------------------------------------------
+let od = global.get("OD_manual");
+
+// 🔥 INICIALIZACIÓN AUTOMÁTICA
+if (od === undefined) {
+    od = 7.66; // valor por defecto
+    global.set("OD_manual", od);
+    node.warn("OD inicializado: " + od);
+}
+
+// -------------------------------------------------
+// LIMPIAR OD DEL SENSOR (CRÍTICO)
+// -------------------------------------------------
+delete msg.payload.OD;
+
+// -------------------------------------------------
+// VARIABLES
+// -------------------------------------------------
+let experiment = global.get("experiment") || "exp1";
+let data = msg.payload;
+
+// -------------------------------------------------
+// FORMATO PARA INFLUX
+// -------------------------------------------------
+msg.measurement = "espectro_raw";
+
+msg.payload = {
+    experiment: experiment,
+
+    TempBMP: Number(data.TempBMP),
+    TempDS: Number(data.TempDS),
+
+    A: Number(data.A),
+    B: Number(data.B),
+    C: Number(data.C),
+    D: Number(data.D),
+    E: Number(data.E),
+    F: Number(data.F),
+    G: Number(data.G),
+    H: Number(data.H),
+
+    R: Number(data.R),
+    I: Number(data.I),
+    S: Number(data.S),
+    J: Number(data.J),
+    T: Number(data.T),
+    U: Number(data.U),
+    V: Number(data.V),
+    W: Number(data.W),
+
+    K: Number(data.K),
+    L: Number(data.L),
+
+    // 🔥 ÚNICO OD VÁLIDO
+    OD: Number(od)
+};
+
+return msg;
