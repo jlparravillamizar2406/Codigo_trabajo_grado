@@ -1,0 +1,821 @@
+[
+    {
+        "id": "951e2f7cf9ec780f",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "db2881dcc65c2683",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Func Promedio",
+        "func": "// -------------------------------------------------\n// BUFFER\n// -------------------------------------------------\nif (!context.buffer) {\n    context.buffer = [];\n}\n\ncontext.buffer.push(msg.payload);\n\n// -------------------------------------------------\nif (context.buffer.length === 15) {\n\n    let result = {};\n    let keys = Object.keys(context.buffer[0]);\n\n    keys.forEach(key => {\n\n        let values = context.buffer.map(sample => sample[key]);\n        values = values.filter(v => typeof v === \"number\");\n\n        if (values.length < 3) return;\n\n        values.sort((a, b) => a - b);\n        let trimmed = values.slice(1, values.length - 1);\n\n        let sum = trimmed.reduce((a, b) => a + b, 0);\n        result[key] = sum / trimmed.length;\n    });\n\n    context.buffer = [];\n\n    // -------------------------------------------------\n    // OD GLOBAL\n    // -------------------------------------------------\n    let od = global.get(\"OD_manual\");\n\n    if (od === undefined) {\n        od = 7.66;\n        global.set(\"OD_manual\", od);\n        node.warn(\"OD inicializado en promedio: \" + od);\n    }\n\n    let experiment = global.get(\"experiment\") || \"exp1\";\n\n    // -------------------------------------------------\n    // SALIDAS\n    // -------------------------------------------------\n\n    let msg_param = {\n        measurement: \"parametros_sensor\",\n        payload: {\n            Time: Number(result.time),\n            Ganancia: Number(result.gain),\n            Inttime: Number(result.intTime),\n            experiment: experiment\n        }\n    };\n\n    let msg_espectro = {\n        measurement: \"espectro_od\",\n        payload: {\n            experiment: experiment,\n\n            A: Number(result.A),\n            B: Number(result.B),\n            C: Number(result.C),\n            D: Number(result.D),\n            E: Number(result.E),\n            F: Number(result.F),\n            G: Number(result.G),\n            H: Number(result.H),\n\n            R: Number(result.R),\n            I: Number(result.I),\n            S: Number(result.S),\n            J: Number(result.J),\n            T: Number(result.T),\n            U: Number(result.U),\n            V: Number(result.V),\n            W: Number(result.W),\n\n            TempBMP: Number(result.TempBMP),\n            TempDS: Number(result.TempDS),\n\n            K: Number(result.K),\n            L: Number(result.L),\n\n            OD: Number(od)\n        }\n    };\n\n    let msg_ambiental = {\n        measurement: \"ambiental\",\n        payload: {\n            experiment: experiment,\n            TempBMP: Number(result.TempBMP),\n            Pressure: Number(result.Pressure),\n            TempDS: Number(result.TempDS)\n        }\n    };\n\n    return [msg_param, msg_espectro, msg_ambiental];\n}\n\nreturn null;",
+        "outputs": 3,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 500,
+        "y": 320,
+        "wires": [
+            [
+                "515b178a92d235b0"
+            ],
+            [
+                "515b178a92d235b0"
+            ],
+            [
+                "515b178a92d235b0"
+            ]
+        ]
+    },
+    {
+        "id": "515b178a92d235b0",
+        "type": "influxdb out",
+        "z": "951e2f7cf9ec780f",
+        "influxdb": "994551bf7984d7cc",
+        "name": "Base_Datos",
+        "measurement": "",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "piscicultura",
+        "bucket": "OD_data",
+        "x": 790,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "969fb8d7128b3e08",
+        "type": "mqtt in",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "topic": "espectro/raw",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "82978df2570d19ab",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 270,
+        "y": 320,
+        "wires": [
+            [
+                "db2881dcc65c2683"
+            ]
+        ]
+    },
+    {
+        "id": "310949af66212ca7",
+        "type": "ui_numeric",
+        "z": "951e2f7cf9ec780f",
+        "name": "OD_manual_input",
+        "label": "OD (mg/L)",
+        "tooltip": "",
+        "group": "d8fa6e66c8d40d14",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "wrap": false,
+        "passthru": false,
+        "topic": "OD_manual",
+        "topicType": "msg",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "14",
+        "step": "0.01",
+        "className": "",
+        "x": 390,
+        "y": 200,
+        "wires": [
+            [
+                "4eab8c73c61af323"
+            ]
+        ]
+    },
+    {
+        "id": "4eab8c73c61af323",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Funcion OD manual",
+        "func": "// -------------------------------------------------\n// GUARDAR OD GLOBAL\n// -------------------------------------------------\nglobal.set(\"OD_manual\", Number(msg.payload));\n\nnode.warn(\"OD actualizado a: \" + msg.payload);\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 200,
+        "wires": [
+            [
+                "bf32f11444e0f1bb"
+            ]
+        ]
+    },
+    {
+        "id": "bf32f11444e0f1bb",
+        "type": "debug",
+        "z": "951e2f7cf9ec780f",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 840,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "999805fb7df9f6ca",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "Valor patron",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "OD_manual",
+        "payload": "1.63",
+        "payloadType": "num",
+        "x": 190,
+        "y": 200,
+        "wires": [
+            [
+                "310949af66212ca7"
+            ]
+        ]
+    },
+    {
+        "id": "1ea7f29ddb5f229b",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 1",
+        "payload": "exp1",
+        "payloadType": "str",
+        "x": 230,
+        "y": 540,
+        "wires": [
+            [
+                "9472e113cacadef5"
+            ]
+        ]
+    },
+    {
+        "id": "1c31aefd5dcf0f65",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 3",
+        "payload": "exp3",
+        "payloadType": "str",
+        "x": 230,
+        "y": 660,
+        "wires": [
+            [
+                "9ea88ad7414c70a8"
+            ]
+        ]
+    },
+    {
+        "id": "dd8aecc69bc784fa",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 2",
+        "payload": "exp2",
+        "payloadType": "str",
+        "x": 230,
+        "y": 600,
+        "wires": [
+            [
+                "cfe3235683e87886"
+            ]
+        ]
+    },
+    {
+        "id": "9472e113cacadef5",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 1",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 540,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cfe3235683e87886",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 2",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 600,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "9ea88ad7414c70a8",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 3",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 660,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "dd3aab8a5193e9fd",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 4",
+        "payload": "exp4",
+        "payloadType": "str",
+        "x": 230,
+        "y": 700,
+        "wires": [
+            [
+                "1f96b506a0665370"
+            ]
+        ]
+    },
+    {
+        "id": "ac46a4283d9346de",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 6",
+        "payload": "exp6",
+        "payloadType": "str",
+        "x": 230,
+        "y": 820,
+        "wires": [
+            [
+                "e17cdd3aff7ca6c3"
+            ]
+        ]
+    },
+    {
+        "id": "a754863f705ecca5",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 5",
+        "payload": "exp5",
+        "payloadType": "str",
+        "x": 230,
+        "y": 760,
+        "wires": [
+            [
+                "abc7675e11df0ea0"
+            ]
+        ]
+    },
+    {
+        "id": "1f96b506a0665370",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 5",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 700,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "abc7675e11df0ea0",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 6",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 760,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "e17cdd3aff7ca6c3",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 7",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 820,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "7bb62d3ba20ce020",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 7",
+        "payload": "exp7",
+        "payloadType": "str",
+        "x": 230,
+        "y": 880,
+        "wires": [
+            [
+                "d6b97235fa4fb579"
+            ]
+        ]
+    },
+    {
+        "id": "8fb7a0fc57caec64",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 9",
+        "payload": "exp9",
+        "payloadType": "str",
+        "x": 230,
+        "y": 1000,
+        "wires": [
+            [
+                "e1f2b24b55582581"
+            ]
+        ]
+    },
+    {
+        "id": "e57da84876b85840",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "EXP 8",
+        "payload": "exp8",
+        "payloadType": "str",
+        "x": 230,
+        "y": 940,
+        "wires": [
+            [
+                "f4bc749f0b6de586"
+            ]
+        ]
+    },
+    {
+        "id": "d6b97235fa4fb579",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 8",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 880,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "f4bc749f0b6de586",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 9",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 940,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "e1f2b24b55582581",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 10",
+        "func": "// -------------------------------------------------\n// GUARDAR EXPERIMENTO GLOBAL\n// -------------------------------------------------\nglobal.set(\"experiment\", msg.payload);\n\nnode.warn(\"Experimento actual: \" + msg.payload);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 1000,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "87d186e79b309de8",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Func datos crudos",
+        "func": "// -------------------------------------------------\n// OBTENER OD GLOBAL\n// -------------------------------------------------\nlet od = global.get(\"OD_manual\");\n\n// 🔥 INICIALIZACIÓN AUTOMÁTICA\nif (od === undefined) {\n    od = 7.66; // valor por defecto\n    global.set(\"OD_manual\", od);\n    node.warn(\"OD inicializado: \" + od);\n}\n\n// -------------------------------------------------\n// LIMPIAR OD DEL SENSOR (CRÍTICO)\n// -------------------------------------------------\ndelete msg.payload.OD;\n\n// -------------------------------------------------\n// VARIABLES\n// -------------------------------------------------\nlet experiment = global.get(\"experiment\") || \"exp1\";\nlet data = msg.payload;\n\n// -------------------------------------------------\n// FORMATO PARA INFLUX\n// -------------------------------------------------\nmsg.measurement = \"espectro_raw\";\n\nmsg.payload = {\n    experiment: experiment,\n\n    TempBMP: Number(data.TempBMP),\n    TempDS: Number(data.TempDS),\n\n    A: Number(data.A),\n    B: Number(data.B),\n    C: Number(data.C),\n    D: Number(data.D),\n    E: Number(data.E),\n    F: Number(data.F),\n    G: Number(data.G),\n    H: Number(data.H),\n\n    R: Number(data.R),\n    I: Number(data.I),\n    S: Number(data.S),\n    J: Number(data.J),\n    T: Number(data.T),\n    U: Number(data.U),\n    V: Number(data.V),\n    W: Number(data.W),\n\n    K: Number(data.K),\n    L: Number(data.L),\n\n    // 🔥 ÚNICO OD VÁLIDO\n    OD: Number(od)\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 530,
+        "y": 420,
+        "wires": [
+            [
+                "949ba3da299e60ed"
+            ]
+        ]
+    },
+    {
+        "id": "82c08ce3ba07e02d",
+        "type": "influxdb out",
+        "z": "951e2f7cf9ec780f",
+        "influxdb": "994551bf7984d7cc",
+        "name": "Base_Datos",
+        "measurement": "",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "piscicultura",
+        "bucket": "OD_data",
+        "x": 950,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "6d6290c67abe874a",
+        "type": "mqtt in",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "topic": "espectro/raw",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "82978df2570d19ab",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 270,
+        "y": 420,
+        "wires": [
+            [
+                "87d186e79b309de8"
+            ]
+        ]
+    },
+    {
+        "id": "949ba3da299e60ed",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 12",
+        "func": "if (!msg.payload) return null;\nif (!msg.measurement) return null;\n\n// evitar NaN\nlet values = Object.values(msg.payload);\n\nfor (let v of values) {\n    if (typeof v === \"number\" && isNaN(v)) {\n        return null;\n    }\n}\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 750,
+        "y": 420,
+        "wires": [
+            [
+                "82c08ce3ba07e02d"
+            ]
+        ]
+    },
+    {
+        "id": "48c8f9b6e870aeee",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Func datos crudos",
+        "func": "// -------------------------------------------------\n// OBTENER OD GLOBAL\n// -------------------------------------------------\nlet od = global.get(\"OD_manual\");\n\n// 🔥 INICIALIZACIÓN AUTOMÁTICA\nif (od === undefined) {\n    od = 7.66; // valor por defecto\n    global.set(\"OD_manual\", od);\n    node.warn(\"OD inicializado: \" + od);\n}\n\n// -------------------------------------------------\n// LIMPIAR OD DEL SENSOR (CRÍTICO)\n// -------------------------------------------------\ndelete msg.payload.OD;\n\n// -------------------------------------------------\n// VARIABLES\n// -------------------------------------------------\nlet experiment = global.get(\"experiment\") || \"exp1\";\nlet data = msg.payload;\n\n// -------------------------------------------------\n// FORMATO PARA INFLUX\n// -------------------------------------------------\nmsg.measurement = \"espectro_raw\";\n\nmsg.payload = {\n    experiment: experiment,\n\n    TempBMP: Number(data.TempBMP),\n    TempDS: Number(data.TempDS),\n\n    A: Number(data.A),\n    B: Number(data.B),\n    C: Number(data.C),\n    D: Number(data.D),\n    E: Number(data.E),\n    F: Number(data.F),\n    G: Number(data.G),\n    H: Number(data.H),\n\n    R: Number(data.R),\n    I: Number(data.I),\n    S: Number(data.S),\n    J: Number(data.J),\n    T: Number(data.T),\n    U: Number(data.U),\n    V: Number(data.V),\n    W: Number(data.W),\n\n    K: Number(data.K),\n    L: Number(data.L),\n\n    // 🔥 ÚNICO OD VÁLIDO\n    OD: Number(od)\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 810,
+        "y": 560,
+        "wires": [
+            [
+                "a4e2b5603e2c0b9f"
+            ]
+        ]
+    },
+    {
+        "id": "6257dae86a319786",
+        "type": "mqtt in",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "topic": "espectro/raw",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "82978df2570d19ab",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 590,
+        "y": 560,
+        "wires": [
+            [
+                "48c8f9b6e870aeee"
+            ]
+        ]
+    },
+    {
+        "id": "a4e2b5603e2c0b9f",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 4",
+        "func": "if (!msg.payload) return null;\nif (!msg.measurement) return null;\n\n// evitar NaN\nlet values = Object.values(msg.payload);\n\nfor (let v of values) {\n    if (typeof v === \"number\" && isNaN(v)) {\n        return null;\n    }\n}\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1030,
+        "y": 560,
+        "wires": [
+            [
+                "b0fcc41fdbba480f"
+            ]
+        ]
+    },
+    {
+        "id": "b0fcc41fdbba480f",
+        "type": "debug",
+        "z": "951e2f7cf9ec780f",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1060,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "994551bf7984d7cc",
+        "type": "influxdb",
+        "hostname": "127.0.0.1",
+        "port": 8086,
+        "protocol": "http",
+        "database": "database",
+        "name": "Influx_local",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://localhost:8086",
+        "timeout": 10,
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "82978df2570d19ab",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "10.242.100.108",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "d8fa6e66c8d40d14",
+        "type": "ui_group",
+        "name": "Entrada OD",
+        "tab": "23e68d587481330b",
+        "order": 1,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "23e68d587481330b",
+        "type": "ui_tab",
+        "name": "Sensor_OD",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "9e6f90e0f0505eaf",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-influxdb": "0.7.0",
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]
