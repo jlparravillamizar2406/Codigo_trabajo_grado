@@ -1,0 +1,193 @@
+#include "SparkFun_AS7265X.h"
+#include <Wire.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <Adafruit_BMP280.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+#define MQTT_MAX_PACKET_SIZE 1024
+
+AS7265X sensor;
+Adafruit_BMP280 bmp;
+
+/******** DS18B20 ********/
+#define ONE_WIRE_BUS 4
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature ds18b20(&oneWire);
+
+/******** LEDS (FIJOS) ********/
+const int led1 = 27;
+const int led2 = 26;
+const int led3 = 25;   // 🔥 NUEVO LED
+
+const int pwmFreq = 5000;
+const int pwmResolution = 8;
+int porcentaje = 80;
+
+/******** WIFI ********/
+const char* ssid = "electrouis";
+const char* password = "12345678910";
+
+/******** MQTT ********/
+const char* mqtt_server = "10.242.100.108";
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+/******** AUTO CONTROL ********/
+uint8_t gainLevels[] = { AS7265X_GAIN_1X, AS7265X_GAIN_16X, AS7265X_GAIN_37X, AS7265X_GAIN_64X };
+uint8_t gainIndex = 2;
+uint16_t intTime = 100;
+
+/******** SENSOR TIMER ********/
+unsigned long lastSample = 0;
+const unsigned long sampleInterval = 1000;
+
+/******** WIFI ********/
+void setup_wifi() {
+  Serial.print("Conectando a WiFi");
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi conectado");
+  Serial.println(WiFi.localIP());
+}
+
+/******** MQTT ********/
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Conectando a MQTT... ");
+    String clientId = "ESP32_" + String(random(0xffff), HEX);
+
+    if (client.connect(clientId.c_str())) {
+      Serial.println("Conectado!");
+    } else {
+      Serial.print("Fallo estado=");
+      Serial.println(client.state());
+      delay(2000);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(2000);
+
+  /******** I2C ********/
+  Wire.begin(21,22);
+  Wire.setClock(400000);
+
+  /******** WIFI ********/
+  setup_wifi();
+  client.setServer(mqtt_server,1883);
+  client.setBufferSize(1024);
+
+  /******** LEDS ********/
+  ledcAttach(led1, pwmFreq, pwmResolution);
+  ledcAttach(led2, pwmFreq, pwmResolution);
+  ledcAttach(led3, pwmFreq, pwmResolution); // 🔥 NUEVO
+
+  int duty = (porcentaje * 255) / 100;
+
+  // 🔥 ENCENDER LOS 3 LEDs DESDE EL INICIO
+  ledcWrite(led1, duty);
+  ledcWrite(led2, duty);
+  ledcWrite(led3, duty);
+
+  Serial.println("3 LEDs encendidos continuamente");
+
+  /******** BMP280 ********/
+  if (!bmp.begin(0x76)) {
+    Serial.println("BMP280 no detectado en 0x76");
+    if (!bmp.begin(0x77)) {
+      Serial.println("BMP280 tampoco detectado");
+    }
+  } else {
+    Serial.println("BMP280 detectado");
+  }
+
+  /******** AS7265X ********/
+  if (!sensor.begin()) {
+    Serial.println("AS7265X no detectado");
+    while(1);
+  }
+
+  Serial.println("AS7265X detectado");
+
+  sensor.disableIndicator();
+  sensor.setMeasurementMode(AS7265X_MEASUREMENT_MODE_6CHAN_CONTINUOUS);
+
+  /******** DS18B20 ********/
+  ds18b20.begin();
+
+  applySettings();
+}
+
+void loop() {
+  if (!client.connected()) reconnect();
+  client.loop();
+
+  if (millis() - lastSample >= sampleInterval) {
+    lastSample = millis();
+    sendData();
+  }
+}
+
+/******** SENSOR SETTINGS ********/
+void applySettings() {
+  sensor.setGain(gainLevels[gainIndex]);
+  sensor.setIntegrationCycles(intTime);
+  delay(100);
+}
+
+/******** MQTT ********/
+void sendData() {
+
+  ds18b20.requestTemperatures();
+  float tempDS = ds18b20.getTempCByIndex(0)+1;
+  float tempBMP = bmp.readTemperature();
+  float pressure = bmp.readPressure()/100.0;
+
+  float t = millis()/1000.0;
+
+  String json="{";
+  json+="\"time\":"+String(t,1)+",";
+  json+="\"gain\":"+String(gainIndex)+",";
+  json+="\"intTime\":"+String(intTime)+",";
+  json+="\"TempBMP\":"+String(tempBMP)+",";
+  json+="\"Pressure\":"+String(pressure)+",";
+  json+="\"TempDS\":"+String(tempDS)+",";
+
+  json+="\"A\":"+String(sensor.getCalibratedA())+",";
+  json+="\"B\":"+String(sensor.getCalibratedB())+",";
+  json+="\"C\":"+String(sensor.getCalibratedC())+",";
+  json+="\"D\":"+String(sensor.getCalibratedD())+",";
+  json+="\"E\":"+String(sensor.getCalibratedE())+",";
+  json+="\"F\":"+String(sensor.getCalibratedF())+",";
+  json+="\"G\":"+String(sensor.getCalibratedG())+",";
+  json+="\"H\":"+String(sensor.getCalibratedH())+",";
+
+  json+="\"R\":"+String(sensor.getCalibratedR())+",";
+  json+="\"I\":"+String(sensor.getCalibratedI())+",";
+  json+="\"S\":"+String(sensor.getCalibratedS())+",";
+  json+="\"J\":"+String(sensor.getCalibratedJ())+",";
+  json+="\"T\":"+String(sensor.getCalibratedT())+",";
+  json+="\"U\":"+String(sensor.getCalibratedU())+",";
+  json+="\"V\":"+String(sensor.getCalibratedV())+",";
+  json+="\"W\":"+String(sensor.getCalibratedW())+",";
+  json+="\"K\":"+String(sensor.getCalibratedK())+",";
+  json+="\"L\":"+String(sensor.getCalibratedL());
+
+  json+="}";
+
+  boolean ok = client.publish("espectro/raw", json.c_str());
+
+  if(ok) Serial.println("MQTT enviado OK");
+  else Serial.println("MQTT ERROR");
+
+  Serial.println(json);
+}
