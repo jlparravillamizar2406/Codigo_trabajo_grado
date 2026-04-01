@@ -2,7 +2,7 @@
 Codigo de Sensor de OD
 
 
-Este repositorio contiene los códigos necesarios para el funcionamiento del sensor de oxígeno disuelto, organizados en las siguientes secciones:
+Este repositorio contiene los códigos necesarios para el funcionamiento del sensor de oxígeno disuelto,en el archivo de programacion se encuentra los comandos que se aplican para ejecutar los programas como mosquitto,Node-red,influxdb y dashboard. A continuacion se presenta el flujo organizados en las siguientes secciones:
 
 1. Código de Arduino:
 Este código se encarga del sensado y la conversión de los datos provenientes del sensor óptico, del sensor de temperatura y del sensor de presión, incluyendo sus funciones y parámetros automáticos para su correcto funcionamiento. Posteriormente, los datos son transmitidos mediante el protocolo MQTT a través de Wi-Fi, llegando al broker Mosquitto, que gestiona la información y la envía a un suscriptor, Node-RED. En Node-RED se realiza un procesamiento inicial de los datos, los cuales se envían en formato JSON.
