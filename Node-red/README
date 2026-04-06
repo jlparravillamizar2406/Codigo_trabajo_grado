@@ -1,0 +1,21 @@
+# Procesamiento en Node-RED
+
+Este módulo contiene el flujo de procesamiento de datos implementado en Node-RED.
+
+## Funcionalidades
+
+- Recepción de datos mediante MQTT
+- Decodificación de datos JSON
+- Procesamiento de señales
+- Cálculo de variables derivadas
+- Envío de datos a InfluxDB
+
+## Funciones implementadas
+
+- datos_crudos
+- promedio_15
+- od_manual
+
+## Visualización
+
+Incluye flujo para monitoreo en tiempo real.
