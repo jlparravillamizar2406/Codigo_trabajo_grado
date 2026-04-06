@@ -1,0 +1,15 @@
+# Código Arduino (ESP32)
+
+Este módulo contiene el código encargado de la adquisición de datos de los sensores y su transmisión mediante MQTT.
+
+## Funcionalidades
+
+- Lectura del sensor AS7265x
+- Lectura de temperatura (DS18B20)
+- Lectura de presión (BMP280)
+- Construcción de datos en formato JSON
+- Envío de datos mediante protocolo MQTT
+
+## Frecuencia de muestreo
+
+1 Hz
