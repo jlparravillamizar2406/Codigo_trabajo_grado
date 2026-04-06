@@ -1,0 +1,15 @@
+# Modelos de aprendizaje automático
+
+Este módulo contiene los scripts utilizados para el análisis de datos y entrenamiento del modelo.
+
+## Funcionalidades
+
+- Limpieza de datos
+- Transformación a absorbancia
+- Entrenamiento de modelos
+- Evaluación (RMSE, R2)
+
+## Modelos utilizados
+
+- Regresión lineal
+- Perceptrón multicapa (MLP)
