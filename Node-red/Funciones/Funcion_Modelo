@@ -1,0 +1,108 @@
+// -------------------------------------------------
+// BUFFER
+// -------------------------------------------------
+if (!context.buffer) {
+    context.buffer = [];
+}
+
+context.buffer.push(msg.payload);
+
+// -------------------------------------------------
+// PROCESAMIENTO CUANDO HAY 15 MUESTRAS
+// -------------------------------------------------
+if (context.buffer.length === 15) {
+
+    let result = {};
+
+    let keys = [
+        "A", "B", "C", "D", "E", "F", "G", "H",
+        "I", "J", "K", "L", "R", "S", "T", "U", "V", "W",
+        "Pressure", "TempDS"
+    ];
+
+    keys.forEach(key => {
+
+        let values = context.buffer
+            .map(sample => sample[key])
+            .filter(v => typeof v === "number" && !isNaN(v));
+
+        // ⚠️ Si no hay datos válidos, se ignora
+        if (values.length === 0) return;
+
+        // -------------------------------------------------
+        // 🔥 MEDIANA (igual que en Python)
+        // -------------------------------------------------
+        values.sort((a, b) => a - b);
+
+        let mid = Math.floor(values.length / 2);
+
+        let median = (values.length % 2 !== 0)
+            ? values[mid]
+            : (values[mid - 1] + values[mid]) / 2;
+
+        result[key] = median;
+    });
+
+    // Limpiar buffer
+    context.buffer = [];
+
+    // -------------------------------------------------
+    // EXPERIMENTO
+    // -------------------------------------------------
+    let experiment = global.get("experiment") || "exp2";
+
+    // -------------------------------------------------
+    // VALIDACIÓN FINAL (evita enviar datos incompletos)
+    // -------------------------------------------------
+    let required = [
+        "A", "B", "C", "D", "E", "F", "G", "H",
+        "I", "J", "K", "L", "R", "S", "T", "U", "V", "W",
+        "TempDS", "Pressure"
+    ];
+
+    for (let k of required) {
+        if (result[k] === undefined || isNaN(result[k])) {
+            node.warn("❌ Falta dato procesado: " + k);
+            return null;
+        }
+    }
+
+    // -------------------------------------------------
+    // MENSAJE FINAL
+    // -------------------------------------------------
+    let msg_espectro = {
+        measurement: "espectro_od",
+        payload: {
+            experiment: experiment,
+
+            A: result.A,
+            B: result.B,
+            C: result.C,
+            D: result.D,
+            E: result.E,
+            F: result.F,
+            G: result.G,
+            H: result.H,
+
+            I: result.I,
+            J: result.J,
+            K: result.K,
+            L: result.L,
+
+            R: result.R,
+            S: result.S,
+            T: result.T,
+            U: result.U,
+            V: result.V,
+            W: result.W,
+
+            TempDS: result.TempDS,
+            Pressure: result.Pressure
+        }
+    };
+
+    return [null, msg_espectro, null];
+}
+
+// -------------------------------------------------
+return null;
