@@ -11,39 +11,39 @@
 AS7265X sensor;
 Adafruit_BMP280 bmp;
 
-/******** DS18B20 ********/
+/*** DS18B20 ***/
 #define ONE_WIRE_BUS 4
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature ds18b20(&oneWire);
 
-/******** LEDS (FIJOS) ********/
+/*** LEDS (FIJOS) ***/
 const int led1 = 27;
 const int led2 = 26;
-const int led3 = 25;   // 🔥 NUEVO LED
+const int led3 = 25;
 
 const int pwmFreq = 5000;
 const int pwmResolution = 8;
 int porcentaje = 80;
 
-/******** WIFI ********/
+/*** WIFI ***/
 const char* ssid = "electrouis";
 const char* password = "12345678910";
 
-/******** MQTT ********/
-const char* mqtt_server = "10.242.100.108";
+/*** MQTT ***/
+const char* mqtt_server = "10.87.233.108";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-/******** AUTO CONTROL ********/
+/*** SENSOR TIMER ***/
+unsigned long lastSample = 0;
+const unsigned long sampleInterval = 1000;
+
+/*** AUTO CONTROL ***/
 uint8_t gainLevels[] = { AS7265X_GAIN_1X, AS7265X_GAIN_16X, AS7265X_GAIN_37X, AS7265X_GAIN_64X };
 uint8_t gainIndex = 2;
 uint16_t intTime = 100;
 
-/******** SENSOR TIMER ********/
-unsigned long lastSample = 0;
-const unsigned long sampleInterval = 1000;
-
-/******** WIFI ********/
+/*** WIFI ***/
 void setup_wifi() {
   Serial.print("Conectando a WiFi");
   WiFi.begin(ssid, password);
@@ -57,7 +57,7 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-/******** MQTT ********/
+/*** MQTT ***/
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Conectando a MQTT... ");
@@ -77,30 +77,27 @@ void setup() {
   Serial.begin(115200);
   delay(2000);
 
-  /******** I2C ********/
   Wire.begin(21,22);
   Wire.setClock(400000);
 
-  /******** WIFI ********/
   setup_wifi();
   client.setServer(mqtt_server,1883);
   client.setBufferSize(1024);
 
-  /******** LEDS ********/
+  /*** LEDS ***/
   ledcAttach(led1, pwmFreq, pwmResolution);
   ledcAttach(led2, pwmFreq, pwmResolution);
-  ledcAttach(led3, pwmFreq, pwmResolution); // 🔥 NUEVO
+  ledcAttach(led3, pwmFreq, pwmResolution);
 
   int duty = (porcentaje * 255) / 100;
 
-  // 🔥 ENCENDER LOS 3 LEDs DESDE EL INICIO
   ledcWrite(led1, duty);
   ledcWrite(led2, duty);
   ledcWrite(led3, duty);
 
-  Serial.println("3 LEDs encendidos continuamente");
+  Serial.println("LEDs encendidos estables");
 
-  /******** BMP280 ********/
+  /*** BMP280 ***/
   if (!bmp.begin(0x76)) {
     Serial.println("BMP280 no detectado en 0x76");
     if (!bmp.begin(0x77)) {
@@ -110,7 +107,7 @@ void setup() {
     Serial.println("BMP280 detectado");
   }
 
-  /******** AS7265X ********/
+  /*** AS7265X ***/
   if (!sensor.begin()) {
     Serial.println("AS7265X no detectado");
     while(1);
@@ -121,7 +118,7 @@ void setup() {
   sensor.disableIndicator();
   sensor.setMeasurementMode(AS7265X_MEASUREMENT_MODE_6CHAN_CONTINUOUS);
 
-  /******** DS18B20 ********/
+  /*** TEMP ***/
   ds18b20.begin();
 
   applySettings();
@@ -137,27 +134,30 @@ void loop() {
   }
 }
 
-/******** SENSOR SETTINGS ********/
+/*** SENSOR SETTINGS ***/
 void applySettings() {
   sensor.setGain(gainLevels[gainIndex]);
   sensor.setIntegrationCycles(intTime);
   delay(100);
 }
 
-/******** MQTT ********/
+/*** ENVÍO ***/
 void sendData() {
 
   ds18b20.requestTemperatures();
-  float tempDS = ds18b20.getTempCByIndex(0)+1;
+
+  float tempDS = ds18b20.getTempCByIndex(0) + 1;
   float tempBMP = bmp.readTemperature();
   float pressure = bmp.readPressure()/100.0;
 
   float t = millis()/1000.0;
 
   String json="{";
+
   json+="\"time\":"+String(t,1)+",";
   json+="\"gain\":"+String(gainIndex)+",";
   json+="\"intTime\":"+String(intTime)+",";
+
   json+="\"TempBMP\":"+String(tempBMP)+",";
   json+="\"Pressure\":"+String(pressure)+",";
   json+="\"TempDS\":"+String(tempDS)+",";
@@ -185,6 +185,11 @@ void sendData() {
   json+="}";
 
   boolean ok = client.publish("espectro/raw", json.c_str());
+
+  Serial.println("----------------------------------");
+  Serial.print("Tiempo: ");
+  Serial.print(t);
+  Serial.println(" s");
 
   if(ok) Serial.println("MQTT enviado OK");
   else Serial.println("MQTT ERROR");
