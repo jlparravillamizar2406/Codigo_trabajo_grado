@@ -1,1 +1,81 @@
-muejejej
+---
+
+## 🧠 Descripción del sistema
+
+InfluxDB se utiliza como base de datos de series de tiempo para almacenar:
+
+- Datos espectrales provenientes del sensor
+- Variables ambientales (temperatura y presión)
+- Resultados del modelo de estimación de OD
+
+Los datos son enviados desde Node-RED mediante el protocolo MQTT y procesados en tiempo real.
+
+---
+
+## 📊 Mediciones utilizadas
+
+### 🔹 1. `espectro_raw`
+Datos crudos directamente desde el sensor.
+
+**Campos:**
+- Bandas espectrales: A, B, C, D, E, F, G, H, I, J, K, L, R, S, T, U, V, W
+- Variables ambientales: TempDS, Pressure
+- Identificador: experiment
+
+---
+
+### 🔹 2. `espectro_od`
+Datos procesados mediante filtrado (mediana ventana 15).
+
+**Campos:**
+- Mismos campos que `espectro_raw`
+- Datos suavizados para reducir ruido
+
+---
+
+### 🔹 3. `od_model`
+Resultados del modelo de estimación.
+
+**Campos:**
+- `OD_model`: valor final calibrado
+- `OD_raw_model`: salida directa del modelo
+- `offset`: valor de calibración aplicado
+
+---
+
+## ⚙️ Configuración básica
+
+### 1. Crear bucket
+
+- **Nombre:** `OD_data`
+- **Organización:** `piscicultura`
+- **Retención:** ilimitada
+
+---
+
+### 2. Conexión
+
+- URL: `http://localhost:8086`
+- Token: definido en la instalación
+
+---
+
+### 3. Integración con Node-RED
+
+Se utilizan nodos `influxdb out` para almacenar datos en las siguientes mediciones:
+
+- `espectro_raw`
+- `espectro_od`
+- `od_model`
+
+---
+
+## 🔍 Consultas (Flux)
+
+### 📌 Consulta de datos del modelo
+
+```flux
+from(bucket: "OD_data")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r._measurement == "od_model")
+  |> filter(fn: (r) => r._field == "OD_model")
