@@ -1,0 +1,23 @@
+MEASUREMENT: espectro_raw
+Campos:
+A, B, C, D, E, F, G, H, I, J, K, L, R, S, T, U, V, W
+TempDS, Pressure
+experiment
+
+-----------------------------------
+
+MEASUREMENT: espectro_od
+Campos:
+A, B, C, D, ..., W
+TempDS, Pressure
+experiment
+
+(Valores filtrados con mediana)
+
+-----------------------------------
+
+MEASUREMENT: od_model
+Campos:
+OD_model
+OD_raw_model
+offset
