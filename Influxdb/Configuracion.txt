@@ -1,0 +1,19 @@
+# Configuración de InfluxDB
+
+## 1. Crear bucket
+
+Nombre: OD_data  
+Organización: piscicultura  
+
+## 2. Configurar conexión
+
+URL: http://localhost:8086  
+Token: (definir según instalación)
+
+## 3. Integración con Node-RED
+
+Se utiliza el nodo influxdb out para escribir:
+
+- espectro_raw
+- espectro_od
+- od_model
