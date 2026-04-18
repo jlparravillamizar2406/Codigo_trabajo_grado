@@ -1,15 +1,52 @@
-# Modelos de aprendizaje automático
+# Modelos de Estimación de Oxígeno Disuelto (OD)
 
-Este módulo contiene los scripts utilizados para el análisis de datos y entrenamiento del modelo.
+Esta carpeta contiene los scripts y procedimientos utilizados para el procesamiento de datos y el entrenamiento del modelo de estimación de oxígeno disuelto (OD) a partir de información espectral.
 
-## Funcionalidades
+El modelo fue desarrollado utilizando regresión lineal múltiple regularizada (Ridge), con el objetivo de obtener una estimación robusta del OD frente a ruido en las mediciones y variaciones en las condiciones del entorno.
 
-- Limpieza de datos
-- Transformación a absorbancia
-- Entrenamiento de modelos
-- Evaluación (RMSE, R2)
+---
 
-## Modelos utilizados
+## Descripción general del modelo
 
-- Regresión lineal
-- Perceptrón multicapa (MLP)
+El modelo estima la concentración de oxígeno disuelto (OD) a partir de:
+
+- Intensidades espectrales (bandas A–W)
+- Combinaciones lineales entre bandas (sumas y restas)
+
+Se emplea regularización tipo Ridge para:
+
+- Reducir el sobreajuste
+- Manejar correlación entre variables
+- Mejorar la estabilidad del modelo
+
+---
+
+## Flujo de procesamiento
+
+El pipeline implementado es el siguiente:
+
+### 1. Adquisición de datos
+Los datos son extraídos desde InfluxDB, incluyendo:
+
+- Bandas espectrales
+- Variable objetivo (OD)
+- Identificador de experimento
+
+---
+
+### 2. Limpieza de datos
+Se realiza:
+
+- Eliminación de valores fuera de rango
+- Conversión a tipo numérico
+- Eliminación de valores nulos
+- Filtrado por experimento
+
+---
+
+### 3. Suavizado (clave del proyecto)
+
+Se aplica un filtro de mediana con ventana de 15 muestras:
+
+```python
+df[col] = df[col].rolling(window=15, center=True).median()
