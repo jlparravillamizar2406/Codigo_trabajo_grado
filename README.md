@@ -1,14 +1,73 @@
-# Codigo_trabajo_grado
-Codigo de Sensor de OD
+Este repositorio contiene el desarrollo completo de un sistema para la estimación de oxígeno disuelto (OD) en agua, basado en espectroscopía óptica, adquisición de datos en tiempo real y modelado mediante técnicas de regresión.
+
+El sistema está compuesto por diferentes módulos que abarcan desde la adquisición de datos hasta su procesamiento, almacenamiento, modelado y visualización.
+
+- Código de Arduino
+
+El módulo de Arduino se encarga de:
+
+Adquirir datos del sensor espectral (AS7265X)
+Leer variables complementarias:
+Temperatura
+Presión
+Realizar procesamiento básico
+Enviar los datos mediante Wi-Fi usando MQTT
+
+Los datos se envían en formato JSON hacia el broker Mosquitto, permitiendo su posterior procesamiento.
+
+- Código de Node-RED
+
+Node-RED actúa como el núcleo del sistema en tiempo real. Sus funciones principales son:
+
+Recepción de datos vía MQTT
+Procesamiento de señales:
+Filtrado mediante mediana (ventana de 15 muestras)
+Cálculo de variables derivadas (sumas y restas entre bandas)
+Implementación del modelo matemático de estimación de OD
+Aplicación de calibración mediante offset
+Envío de datos hacia InfluxDB
+Visualización en dashboard en tiempo real
+
+Los datos procesados incluyen:
+
+Bandas espectrales (A–W)
+Variables ambientales (temperatura, presión)
+OD estimado (modelo)
+OD crudo (sin calibración)
+
+- InfluxDB (Base de Datos)
+
+InfluxDB se utiliza como sistema de almacenamiento de series temporales.
+
+En este módulo se define:
+
+Organización (org)
+Bucket (OD_data)
+Measurements:
+espectro_raw → datos originales
+espectro_od → datos procesados
+od_model → salida del modelo
+
+Permite:
+
+Almacenamiento eficiente en el tiempo
+Consultas mediante Flux
+Integración directa con Grafana para visualización
 
 
-Este repositorio contiene los códigos necesarios para el funcionamiento del sensor de oxígeno disuelto,en el archivo de programacion se encuentra los comandos que se aplican para ejecutar los programas como mosquitto,Node-red,influxdb y dashboard. A continuacion se presenta el flujo organizado en las siguientes secciones:
+- Modelado en Python
 
-1. Código de Arduino:
-Este código se encarga del sensado y la conversión de los datos provenientes del sensor óptico, del sensor de temperatura y del sensor de presión, incluyendo sus funciones y parámetros automáticos para su correcto funcionamiento. Posteriormente, los datos son transmitidos mediante el protocolo MQTT a través de Wi-Fi, llegando al broker Mosquitto, que gestiona la información y la envía a un suscriptor, Node-RED. En Node-RED se realiza un procesamiento inicial de los datos, los cuales se envían en formato JSON.
+El módulo de modelos se encarga de:
 
-2. Código de Node-RED:
-Este código permite la recepción de los datos provenientes de Arduino mediante el protocolo MQTT, incluyendo los canales espectrales, la temperatura y la presión del sensor. Los datos en formato JSON se transforman para ser compatibles con una base de datos de series temporales, InfluxDB. Uno de los flujos consiste en almacenar los datos en InfluxDB con la organización correspondiente, incluyendo bucket, token, measurement y field. Otro flujo genera un dashboard para monitorear en tiempo real el valor de oxígeno disuelto del sensor patrón. Además, los datos se etiquetan según el experimento y se envían a la base de datos para su registro y análisis posterior.
+Extracción de datos desde InfluxDB
+Limpieza y filtrado de datos
+Aplicación de suavizado mediante mediana
+Construcción de variables derivadas:
+Restas (ej: B - D)
+Sumas (ej: B + D)
 
-3. Código de Python:
-Este código se encarga del tratamiento de los datos almacenados en InfluxDB y de la creación de un modelo mediante técnicas de Deep Learning. Se toman los datos en tiempos específicos, se unifican distintos archivos Excel y se evalúa la linealidad de los canales mediante métricas como R² y RMSE. Con esto, se determina la validez e importancia de los canales espectrales y se puede evaluar el desempeño y la confiabilidad del modelo generado.
+Se emplea un modelo de regresión lineal múltiple regularizada (Ridge), el cual permite:
+
+Reducir el sobreajuste
+Mejorar la estabilidad del modelo
+Manejar correlación entre variables
