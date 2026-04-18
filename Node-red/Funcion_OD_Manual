@@ -1,8 +1,0 @@
-// -------------------------------------------------
-// GUARDAR OD GLOBAL
-// -------------------------------------------------
-global.set("OD_manual", Number(msg.payload));
-
-node.warn("OD actualizado a: " + msg.payload);
-
-return msg;
