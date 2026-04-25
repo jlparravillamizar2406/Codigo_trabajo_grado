@@ -1,0 +1,474 @@
+[
+    {
+        "id": "db2881dcc65c2683",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Func Promedio",
+        "func": "// -------------------------------------------------\n// BUFFER\n// -------------------------------------------------\nif (!context.buffer) {\n    context.buffer = [];\n}\n\ncontext.buffer.push(msg.payload);\n\n// -------------------------------------------------\nif (context.buffer.length === 15) {\n\n    let result = {};\n    let keys = Object.keys(context.buffer[0]);\n\n    keys.forEach(key => {\n\n        let values = context.buffer.map(sample => sample[key]);\n        values = values.filter(v => typeof v === \"number\");\n\n        if (values.length < 3) return;\n\n        values.sort((a, b) => a - b);\n        let trimmed = values.slice(1, values.length - 1);\n\n        let sum = trimmed.reduce((a, b) => a + b, 0);\n        result[key] = sum / trimmed.length;\n    });\n\n    context.buffer = [];\n\n    // -------------------------------------------------\n    // OD GLOBAL\n    // -------------------------------------------------\n    let od = global.get(\"OD_manual\");\n\n    if (od === undefined) {\n        od = 7.66;\n        global.set(\"OD_manual\", od);\n        node.warn(\"OD inicializado en promedio: \" + od);\n    }\n\n    let experiment = global.get(\"experiment\") || \"exp1\";\n\n    // -------------------------------------------------\n    // SALIDAS\n    // -------------------------------------------------\n\n    let msg_param = {\n        measurement: \"parametros_sensor\",\n        payload: {\n            Time: Number(result.time),\n            Ganancia: Number(result.gain),\n            Inttime: Number(result.intTime),\n            experiment: experiment\n        }\n    };\n\n    let msg_espectro = {\n        measurement: \"espectro_od\",\n        payload: {\n            experiment: experiment,\n\n            A: Number(result.A),\n            B: Number(result.B),\n            C: Number(result.C),\n            D: Number(result.D),\n            E: Number(result.E),\n            F: Number(result.F),\n            G: Number(result.G),\n            H: Number(result.H),\n\n            R: Number(result.R),\n            I: Number(result.I),\n            S: Number(result.S),\n            J: Number(result.J),\n            T: Number(result.T),\n            U: Number(result.U),\n            V: Number(result.V),\n            W: Number(result.W),\n\n            TempBMP: Number(result.TempBMP),\n            TempDS: Number(result.TempDS),\n            Pressure: Number(result.Pressure),\n\n            K: Number(result.K),\n            L: Number(result.L),\n\n            OD: Number(od)\n        }\n    };\n\n    let msg_ambiental = {\n        measurement: \"ambiental\",\n        payload: {\n            experiment: experiment,\n            TempBMP: Number(result.TempBMP),\n            Pressure: Number(result.Pressure),\n            TempDS: Number(result.TempDS)\n        }\n    };\n\n    return [msg_param, msg_espectro, msg_ambiental];\n}\n\nreturn null;",
+        "outputs": 3,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 500,
+        "y": 400,
+        "wires": [
+            [
+                "515b178a92d235b0"
+            ],
+            [
+                "515b178a92d235b0"
+            ],
+            [
+                "515b178a92d235b0"
+            ]
+        ]
+    },
+    {
+        "id": "515b178a92d235b0",
+        "type": "influxdb out",
+        "z": "951e2f7cf9ec780f",
+        "influxdb": "994551bf7984d7cc",
+        "name": "Base_Datos",
+        "measurement": "",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "piscicultura",
+        "bucket": "OD_data",
+        "x": 790,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "969fb8d7128b3e08",
+        "type": "mqtt in",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "topic": "espectro/raw",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "82978df2570d19ab",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 270,
+        "y": 400,
+        "wires": [
+            [
+                "db2881dcc65c2683"
+            ]
+        ]
+    },
+    {
+        "id": "4eab8c73c61af323",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Funcion OD manual",
+        "func": "// -------------------------------------------------\n// GUARDAR OD GLOBAL\n// -------------------------------------------------\nglobal.set(\"OD_manual\", Number(msg.payload));\n\nnode.warn(\"OD actualizado a: \" + msg.payload);\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 660,
+        "y": 80,
+        "wires": [
+            [
+                "bf32f11444e0f1bb"
+            ]
+        ]
+    },
+    {
+        "id": "bf32f11444e0f1bb",
+        "type": "debug",
+        "z": "951e2f7cf9ec780f",
+        "name": "debug 2",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 880,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "999805fb7df9f6ca",
+        "type": "inject",
+        "z": "951e2f7cf9ec780f",
+        "name": "Valor patron",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "OD_manual",
+        "payload": "7",
+        "payloadType": "num",
+        "x": 230,
+        "y": 80,
+        "wires": [
+            [
+                "310949af66212ca7"
+            ]
+        ]
+    },
+    {
+        "id": "87d186e79b309de8",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Func datos crudos",
+        "func": "// -------------------------------------------------\n// OBTENER OD GLOBAL\n// -------------------------------------------------\nlet od = global.get(\"OD_manual\");\n\n// 🔥 INICIALIZACIÓN AUTOMÁTICA\nif (od === undefined) {\n    od = 7.66; // valor por defecto\n    global.set(\"OD_manual\", od);\n    node.warn(\"OD inicializado: \" + od);\n}\n\n// -------------------------------------------------\n// LIMPIAR OD DEL SENSOR (CRÍTICO)\n// -------------------------------------------------\ndelete msg.payload.OD;\n\n// -------------------------------------------------\n// VARIABLES\n// -------------------------------------------------\nlet experiment = global.get(\"experiment\") || \"exp1\";\nlet data = msg.payload;\n\n// -------------------------------------------------\n// FORMATO PARA INFLUX\n// -------------------------------------------------\nmsg.measurement = \"espectro_raw\";\n\nmsg.payload = {\n    experiment: experiment,\n\n    TempBMP: Number(data.TempBMP),\n    TempDS: Number(data.TempDS),\n    Pressure: Number(data.Pressure),\n\n    A: Number(data.A),\n    B: Number(data.B),\n    C: Number(data.C),\n    D: Number(data.D),\n    E: Number(data.E),\n    F: Number(data.F),\n    G: Number(data.G),\n    H: Number(data.H),\n\n    R: Number(data.R),\n    I: Number(data.I),\n    S: Number(data.S),\n    J: Number(data.J),\n    T: Number(data.T),\n    U: Number(data.U),\n    V: Number(data.V),\n    W: Number(data.W),\n\n    K: Number(data.K),\n    L: Number(data.L),\n\n    // 🔥 ÚNICO OD VÁLIDO\n    OD: Number(od)\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 530,
+        "y": 500,
+        "wires": [
+            [
+                "949ba3da299e60ed"
+            ]
+        ]
+    },
+    {
+        "id": "82c08ce3ba07e02d",
+        "type": "influxdb out",
+        "z": "951e2f7cf9ec780f",
+        "influxdb": "994551bf7984d7cc",
+        "name": "Base_Datos",
+        "measurement": "",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "piscicultura",
+        "bucket": "OD_data",
+        "x": 950,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "6d6290c67abe874a",
+        "type": "mqtt in",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "topic": "espectro/raw",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "82978df2570d19ab",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 270,
+        "y": 500,
+        "wires": [
+            [
+                "87d186e79b309de8"
+            ]
+        ]
+    },
+    {
+        "id": "949ba3da299e60ed",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "function 12",
+        "func": "if (!msg.payload) return null;\nif (!msg.measurement) return null;\n\n// evitar NaN\nlet values = Object.values(msg.payload);\n\nfor (let v of values) {\n    if (typeof v === \"number\" && isNaN(v)) {\n        return null;\n    }\n}\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 750,
+        "y": 500,
+        "wires": [
+            [
+                "82c08ce3ba07e02d"
+            ]
+        ]
+    },
+    {
+        "id": "084e10b8a72ec670",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Func Promedio",
+        "func": "// -------------------------------------------------\n// BUFFER\n// -------------------------------------------------\nif (!context.buffer) {\n    context.buffer = [];\n}\n\ncontext.buffer.push(msg.payload);\n\n// -------------------------------------------------\n// PROCESAMIENTO CUANDO HAY 15 MUESTRAS\n// -------------------------------------------------\nif (context.buffer.length === 15) {\n\n    let result = {};\n\n    let keys = [\n        \"A\", \"B\", \"C\", \"D\", \"E\", \"F\", \"G\", \"H\",\n        \"I\", \"J\", \"K\", \"L\", \"R\", \"S\", \"T\", \"U\", \"V\", \"W\",\n        \"Pressure\", \"TempDS\"\n    ];\n\n    keys.forEach(key => {\n\n        let values = context.buffer\n            .map(sample => sample[key])\n            .filter(v => typeof v === \"number\" && !isNaN(v));\n\n        // ⚠️ Si no hay datos válidos, se ignora\n        if (values.length === 0) return;\n\n        // -------------------------------------------------\n        // 🔥 MEDIANA (igual que en Python)\n        // -------------------------------------------------\n        values.sort((a, b) => a - b);\n\n        let mid = Math.floor(values.length / 2);\n\n        let median = (values.length % 2 !== 0)\n            ? values[mid]\n            : (values[mid - 1] + values[mid]) / 2;\n\n        result[key] = median;\n    });\n\n    // Limpiar buffer\n    context.buffer = [];\n\n    // -------------------------------------------------\n    // EXPERIMENTO\n    // -------------------------------------------------\n    let experiment = global.get(\"experiment\") || \"exp2\";\n\n    // -------------------------------------------------\n    // VALIDACIÓN FINAL (evita enviar datos incompletos)\n    // -------------------------------------------------\n    let required = [\n        \"A\", \"B\", \"C\", \"D\", \"E\", \"F\", \"G\", \"H\",\n        \"I\", \"J\", \"K\", \"L\", \"R\", \"S\", \"T\", \"U\", \"V\", \"W\",\n        \"TempDS\", \"Pressure\"\n    ];\n\n    for (let k of required) {\n        if (result[k] === undefined || isNaN(result[k])) {\n            node.warn(\"❌ Falta dato procesado: \" + k);\n            return null;\n        }\n    }\n\n    // -------------------------------------------------\n    // MENSAJE FINAL\n    // -------------------------------------------------\n    let msg_espectro = {\n        measurement: \"espectro_od\",\n        payload: {\n            experiment: experiment,\n\n            A: result.A,\n            B: result.B,\n            C: result.C,\n            D: result.D,\n            E: result.E,\n            F: result.F,\n            G: result.G,\n            H: result.H,\n\n            I: result.I,\n            J: result.J,\n            K: result.K,\n            L: result.L,\n\n            R: result.R,\n            S: result.S,\n            T: result.T,\n            U: result.U,\n            V: result.V,\n            W: result.W,\n\n            TempDS: result.TempDS,\n            Pressure: result.Pressure\n        }\n    };\n\n    return [null, msg_espectro, null];\n}\n\n// -------------------------------------------------\nreturn null;",
+        "outputs": 3,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 520,
+        "y": 280,
+        "wires": [
+            [],
+            [
+                "79f24b3e9f0e7286"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "e49903583db6b4a3",
+        "type": "influxdb out",
+        "z": "951e2f7cf9ec780f",
+        "influxdb": "994551bf7984d7cc",
+        "name": "Base_Datos",
+        "measurement": "",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "piscicultura",
+        "bucket": "OD_data",
+        "x": 1050,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "c7c42107fbb8b128",
+        "type": "mqtt in",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "topic": "espectro/raw",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "82978df2570d19ab",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 270,
+        "y": 280,
+        "wires": [
+            [
+                "084e10b8a72ec670"
+            ]
+        ]
+    },
+    {
+        "id": "79f24b3e9f0e7286",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "Modelo OD",
+        "func": "let d = msg.payload;\n\n// -----------------------------\n// VALIDACIÓN\n// -----------------------------\nif (!d) return null;\n\nlet bands = [\n    \"A\", \"B\", \"C\", \"D\", \"E\", \"F\", \"G\", \"H\",\n    \"I\", \"J\", \"K\", \"L\", \"R\", \"S\", \"T\", \"U\", \"V\", \"W\"\n];\n\nfor (let k of bands) {\n    if (d[k] === undefined || isNaN(d[k])) {\n        node.warn(\"❌ Falta dato: \" + k);\n        return null;\n    }\n}\n\n// -----------------------------\n// FEATURES DERIVADAS\n// -----------------------------\nlet B_minus_D = d.B - d.D;\nlet C_minus_E = d.C - d.E;\nlet H_minus_I = d.H - d.I;\n\nlet B_plus_D = d.B + d.D;\nlet C_plus_E = d.C + d.E;\n\n// -----------------------------\n// 🔥 MODELO (ESTABLE)\n// -----------------------------\nlet OD_raw =\n    -126.290661\n    + (-1.565949 * d.A)\n    + (0.015876 * d.B)\n    + (-0.011128 * d.C)\n    + (-0.016304 * d.D)\n    + (0.060655 * d.E)\n    + (-0.179039 * d.F)\n    + (-0.221276 * d.G)\n    + (0.029210 * d.H)\n    + (0.091099 * d.I)\n    + (-0.008144 * d.J)\n    + (0.224470 * d.K)\n    + (0.394721 * d.L)\n    + (0.009780 * d.R)\n    + (-0.007076 * d.S)\n    + (0.081659 * d.T)\n    + (-0.016944 * d.U)\n    + (0.052256 * d.V)\n    + (-0.055142 * d.W)\n    + (0.032180 * B_minus_D)\n    + (-0.071783 * C_minus_E)\n    + (-0.061889 * H_minus_I)\n    + (-0.000427 * B_plus_D)\n    + (0.049527 * C_plus_E);\n\n// Guardar último valor\nflow.set(\"ultimo_OD_raw\", OD_raw);\n\n// -----------------------------\n// CALIBRACIÓN POR OFFSET\n// -----------------------------\nlet offset = flow.get(\"offset\") || 0;\nlet OD_final = OD_raw + offset;\n\n// -----------------------------\n// PROTECCIÓN FÍSICA\n// -----------------------------\nif (OD_final < 0) OD_final = 0;\nif (OD_final > 20) OD_final = 20;\n\n// -----------------------------\n// 🔥 DEBUG COMPLETO (CLAVE)\n// -----------------------------\nnode.warn(\n    \"📊 OD RAW: \" + OD_raw.toFixed(3) +\n    \" | OFFSET: \" + offset.toFixed(3) +\n    \" | OD FINAL: \" + OD_final.toFixed(3)\n);\n\n// -----------------------------\n// OUTPUT\n// -----------------------------\nmsg.measurement = \"od_model\";\n\nmsg.payload = {\n    OD_model: OD_final,\n    OD_raw_model: OD_raw,\n    offset: offset\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 770,
+        "y": 280,
+        "wires": [
+            [
+                "e49903583db6b4a3"
+            ]
+        ]
+    },
+    {
+        "id": "cfe1e90d1f9ac041",
+        "type": "debug",
+        "z": "951e2f7cf9ec780f",
+        "name": "debug 3",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1000,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "310949af66212ca7",
+        "type": "ui_numeric",
+        "z": "951e2f7cf9ec780f",
+        "name": "OD_manual_input",
+        "label": "OD (mg/L)",
+        "tooltip": "",
+        "group": "d8fa6e66c8d40d14",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "wrap": false,
+        "passthru": false,
+        "topic": "OD_manual",
+        "topicType": "msg",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "14",
+        "step": "0.01",
+        "className": "",
+        "x": 430,
+        "y": 80,
+        "wires": [
+            [
+                "4eab8c73c61af323"
+            ]
+        ]
+    },
+    {
+        "id": "5df2d2de7efe2fcc",
+        "type": "function",
+        "z": "951e2f7cf9ec780f",
+        "name": "función guardar alto",
+        "func": "// Tomar último valor del modelo\nlet OD_raw = flow.get(\"ultimo_OD_raw\");\n\n// Tomar valor real (slider)\nlet OD_real = global.get(\"OD_manual\") || 7;\n\n// calcular offset\nlet offset = OD_real - OD_raw;\n\n// guardar\nflow.set(\"offset\", offset);\n\nnode.warn(\"✅ Offset calibrado: \" + offset);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 180,
+        "wires": [
+            [
+                "0488979caec995de"
+            ]
+        ]
+    },
+    {
+        "id": "67d7132de6f9533a",
+        "type": "ui_button",
+        "z": "951e2f7cf9ec780f",
+        "name": "",
+        "group": "d8fa6e66c8d40d14",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "label": "Calibrar",
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "topic": "calibrar",
+        "topicType": "msg",
+        "x": 220,
+        "y": 180,
+        "wires": [
+            [
+                "5df2d2de7efe2fcc"
+            ]
+        ]
+    },
+    {
+        "id": "0488979caec995de",
+        "type": "debug",
+        "z": "951e2f7cf9ec780f",
+        "name": "debug 4",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 600,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "994551bf7984d7cc",
+        "type": "influxdb",
+        "hostname": "127.0.0.1",
+        "port": 8086,
+        "protocol": "http",
+        "database": "database",
+        "name": "Influx_local",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://localhost:8086",
+        "timeout": 10,
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "82978df2570d19ab",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "10.118.111.108",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "d8fa6e66c8d40d14",
+        "type": "ui_group",
+        "name": "Entrada OD",
+        "tab": "23e68d587481330b",
+        "order": 1,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "23e68d587481330b",
+        "type": "ui_tab",
+        "name": "Sensor_OD",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "6ac8156081f2e9fd",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-influxdb": "0.7.0",
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]
