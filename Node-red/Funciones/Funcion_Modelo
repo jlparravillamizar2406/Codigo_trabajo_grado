@@ -1,108 +1,116 @@
-// -------------------------------------------------
-// BUFFER
-// -------------------------------------------------
-if (!context.buffer) {
-    context.buffer = [];
-}
+let d = msg.payload;
 
-context.buffer.push(msg.payload);
+// -----------------------------
+// VALIDACIÓN
+// -----------------------------
+if (!d) return null;
 
-// -------------------------------------------------
-// PROCESAMIENTO CUANDO HAY 15 MUESTRAS
-// -------------------------------------------------
-if (context.buffer.length === 15) {
+let bands = [
+    "A","B","C","D","E","F","G","H",
+    "I","J","K","L","R","S","T","U","V","W"
+];
 
-    let result = {};
-
-    let keys = [
-        "A", "B", "C", "D", "E", "F", "G", "H",
-        "I", "J", "K", "L", "R", "S", "T", "U", "V", "W",
-        "Pressure", "TempDS"
-    ];
-
-    keys.forEach(key => {
-
-        let values = context.buffer
-            .map(sample => sample[key])
-            .filter(v => typeof v === "number" && !isNaN(v));
-
-        // ⚠️ Si no hay datos válidos, se ignora
-        if (values.length === 0) return;
-
-        // -------------------------------------------------
-        // 🔥 MEDIANA (igual que en Python)
-        // -------------------------------------------------
-        values.sort((a, b) => a - b);
-
-        let mid = Math.floor(values.length / 2);
-
-        let median = (values.length % 2 !== 0)
-            ? values[mid]
-            : (values[mid - 1] + values[mid]) / 2;
-
-        result[key] = median;
-    });
-
-    // Limpiar buffer
-    context.buffer = [];
-
-    // -------------------------------------------------
-    // EXPERIMENTO
-    // -------------------------------------------------
-    let experiment = global.get("experiment") || "exp2";
-
-    // -------------------------------------------------
-    // VALIDACIÓN FINAL (evita enviar datos incompletos)
-    // -------------------------------------------------
-    let required = [
-        "A", "B", "C", "D", "E", "F", "G", "H",
-        "I", "J", "K", "L", "R", "S", "T", "U", "V", "W",
-        "TempDS", "Pressure"
-    ];
-
-    for (let k of required) {
-        if (result[k] === undefined || isNaN(result[k])) {
-            node.warn("❌ Falta dato procesado: " + k);
-            return null;
-        }
+for (let k of bands) {
+    if (d[k] === undefined || isNaN(d[k])) {
+        node.warn("❌ Falta dato: " + k);
+        return null;
     }
-
-    // -------------------------------------------------
-    // MENSAJE FINAL
-    // -------------------------------------------------
-    let msg_espectro = {
-        measurement: "espectro_od",
-        payload: {
-            experiment: experiment,
-
-            A: result.A,
-            B: result.B,
-            C: result.C,
-            D: result.D,
-            E: result.E,
-            F: result.F,
-            G: result.G,
-            H: result.H,
-
-            I: result.I,
-            J: result.J,
-            K: result.K,
-            L: result.L,
-
-            R: result.R,
-            S: result.S,
-            T: result.T,
-            U: result.U,
-            V: result.V,
-            W: result.W,
-
-            TempDS: result.TempDS,
-            Pressure: result.Pressure
-        }
-    };
-
-    return [null, msg_espectro, null];
 }
 
-// -------------------------------------------------
-return null;
+// -----------------------------
+// VARIABLES FÍSICAS
+// -----------------------------
+let T = d.TempDS;       // °C
+let P = d.Pressure;     // kPa
+
+if (isNaN(T) || isNaN(P)) {
+    node.warn("❌ Falta temperatura o presión");
+    return null;
+}
+
+// -----------------------------
+// FEATURES DERIVADAS
+// -----------------------------
+let B_minus_D = d.B - d.D;
+let C_minus_E = d.C - d.E;
+let H_minus_I = d.H - d.I;
+
+let B_plus_D = d.B + d.D;
+let C_plus_E = d.C + d.E;
+
+// -----------------------------
+// 🔥 MODELO (TU REGRESIÓN)
+// -----------------------------
+let OD_raw =
+    -126.290661
+    + (-1.565949 * d.A)
+    + (0.015876 * d.B)
+    + (-0.011128 * d.C)
+    + (-0.016304 * d.D)
+    + (0.060655 * d.E)
+    + (-0.179039 * d.F)
+    + (-0.221276 * d.G)
+    + (0.029210 * d.H)
+    + (0.091099 * d.I)
+    + (-0.008144 * d.J)
+    + (0.224470 * d.K)
+    + (0.394721 * d.L)
+    + (0.009780 * d.R)
+    + (-0.007076 * d.S)
+    + (0.081659 * d.T)
+    + (-0.016944 * d.U)
+    + (0.052256 * d.V)
+    + (-0.055142 * d.W)
+    + (0.032180 * B_minus_D)
+    + (-0.071783 * C_minus_E)
+    + (-0.061889 * H_minus_I)
+    + (-0.000427 * B_plus_D)
+    + (0.049527 * C_plus_E);
+
+// -----------------------------
+// 🌡️ OD SATURACIÓN (FÍSICO)
+// -----------------------------
+let OD_sat =
+    (14.652
+    - 0.41022 * T
+    + 0.007991 * Math.pow(T,2)
+    - 0.000077774 * Math.pow(T,3))
+    * (P / 101.325);
+
+// -----------------------------
+// 🔥 CALIBRACIÓN AUTOMÁTICA
+// -----------------------------
+let offset = OD_sat - OD_raw;
+let OD_final = OD_raw + offset;
+
+// -----------------------------
+// PROTECCIÓN FÍSICA
+// -----------------------------
+if (OD_final < 0) OD_final = 0;
+if (OD_final > 20) OD_final = 20;
+
+// -----------------------------
+// DEBUG (CLAVE PARA TESIS)
+// -----------------------------
+node.warn(
+    "🌡️ T: " + T.toFixed(2) +
+    " | P: " + P.toFixed(2) +
+    " | OD_sat: " + OD_sat.toFixed(3) +
+    " | OD_raw: " + OD_raw.toFixed(3) +
+    " | OD_final: " + OD_final.toFixed(3)
+);
+
+// -----------------------------
+// OUTPUT
+// -----------------------------
+msg.measurement = "od_model";
+
+msg.payload = {
+    OD_model: OD_final,
+    OD_raw_model: OD_raw,
+    OD_sat: OD_sat,
+    temperatura: T,
+    presion: P
+};
+
+return msg;
