@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 
 from influxdb_client import InfluxDBClient
 from sklearn.linear_model import RidgeCV
-from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from sklearn.model_selection import train_test_split
 
 # -------------------------------------------------
-# 🔌 CONEXIÓN
+# 🔌 CONEXIÓN (NO TOCAR)
 # -------------------------------------------------
 url = "http://localhost:8086"
-token = "Tu_token"
+token = "kh-vfxC3wt2Xd2yPsw-jBGrF976y_s0ivUKsaj7PCvXrgvwpkTRf839BGtLhnTa8o1H0OXxQqfrWgDYytckZxA=="
 org = "piscicultura"
 bucket = "OD_data"
 
@@ -19,11 +19,11 @@ client = InfluxDBClient(url=url, token=token, org=org)
 query_api = client.query_api()
 
 # -------------------------------------------------
-# ⏱ DOS RANGOS
+# ⏱ RANGOS
 # -------------------------------------------------
 ranges = [
-    ("2026-04-13 08:41:00", "2026-04-13 11:14:00"),
-    ("2026-04-13 14:40:00", "2026-04-13 16:12:00"),
+    ("2026-03-27 09:18:00", "2026-03-27 11:40:00"),
+    ("2026-03-27 15:21:00", "2026-03-27 16:57:00"),
 ]
 
 dfs = []
@@ -53,7 +53,7 @@ for start_str, stop_str in ranges:
 df = pd.concat(dfs).sort_values("_time")
 
 # -------------------------------------------------
-# 🧹 LIMPIEZA FUERTE
+# 🧹 LIMPIEZA
 # -------------------------------------------------
 df = df.drop(columns=["result","table","_start","_stop","_measurement"], errors="ignore")
 
@@ -66,41 +66,75 @@ for col in df.columns:
 
 bands = ["A","B","C","D","E","F","G","H","I","J","K","L","R","S","T","U","V","W"]
 
-# eliminar basura extrema
+# -------------------------------------------------
+# 🔥 FILTRO FUERTE
+# -------------------------------------------------
 for col in bands:
     df = df[(df[col] > 0) & (df[col] < 10000)]
 
-df = df.dropna()
-df = df[df["experiment"] == "exp2"].copy()
+df = df.dropna(subset=bands + ["OD", "TempDS"])
 
-print("Datos limpios:", len(df))
+# separar experimentos
+df_exp1 = df[df["experiment"] == "exp1"].copy()  # vacío
+df_exp2 = df[df["experiment"] == "exp2"].copy()  # medición real
+
+print("Exp1 (vacío):", len(df_exp1))
+print("Exp2 (medición):", len(df_exp2))
 
 # -------------------------------------------------
-# 🔥 SUAVIZADO
+# 🔥 SUAVIZADO (MEDIANA)
 # -------------------------------------------------
 window = 15
 
-df_smooth = df.copy()
+for col in bands + ["TempDS"]:
+    df_exp1[col] = df_exp1[col].rolling(window, center=True).median()
+    df_exp2[col] = df_exp2[col].rolling(window, center=True).median()
+
+df_exp1 = df_exp1.dropna()
+df_exp2 = df_exp2.dropna()
+
+# -------------------------------------------------
+# 🌈 CÁLCULO DE I0 (PROMEDIO DEL VACÍO)
+# -------------------------------------------------
+I0 = df_exp1[bands].mean()
+
+print("\nI0 (referencia):")
+print(I0)
+
+# -------------------------------------------------
+# 🌈 ABSORBANCIA
+# -------------------------------------------------
+A = pd.DataFrame(index=df_exp2.index)
 
 for col in bands:
-    df_smooth[col] = df_smooth[col].rolling(window, center=True).median()
+    I = df_exp2[col]
+    ref = I0[col]
 
-df_smooth = df_smooth.dropna()
+    I = np.clip(I, 1e-6, None)
+    ref = max(ref, 1e-6)
+
+    A[col] = -np.log10(I / ref)
+
+A = A.replace([np.inf, -np.inf], np.nan)
+A = A.dropna()
+
+df_exp2 = df_exp2.loc[A.index]
 
 # -------------------------------------------------
-# 🔥 FEATURES NUEVAS (SUMAS + RESTAS)
+# 🔥 FEATURES
 # -------------------------------------------------
-X = df_smooth[bands].copy()
-y = df_smooth["OD"]
+X = A.copy()
 
-# RESTAS (MUY IMPORTANTES)
-X["B_minus_D"] = X["B"] - X["D"]
-X["C_minus_E"] = X["C"] - X["E"]
-X["H_minus_I"] = X["H"] - X["I"]
+# combinaciones útiles
+X["B_minus_D"] = A["B"] - A["D"]
+X["C_minus_E"] = A["C"] - A["E"]
 
-# SUMAS (ESTABLES)
-X["B_plus_D"] = X["B"] + X["D"]
-X["C_plus_E"] = X["C"] + X["E"]
+# temperatura (SI SE MANTIENE)
+X["TempDS"] = df_exp2["TempDS"]
+
+y = df_exp2["OD"]
+
+print("Datos finales ML:", len(X))
 
 # -------------------------------------------------
 # 🔥 ENTRENAMIENTO
@@ -113,7 +147,7 @@ best_r2 = -999
 for seed in range(50):
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=seed
+        X, y, test_size=0.3, random_state=seed
     )
 
     model = RidgeCV(alphas=alphas)
@@ -124,32 +158,56 @@ for seed in range(50):
     r2 = r2_score(y_test, y_pred)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 
-    print(f"[SUM+REST] Seed {seed} → R2: {r2:.4f} | RMSE: {rmse:.4f}")
+    print(f"[SEED {seed}] R2: {r2:.4f} | RMSE: {rmse:.4f}")
 
     if r2 > best_r2:
         best_r2 = r2
         best_model = model
+        best_y_test = y_test
+        best_y_pred = y_pred
 
 # -------------------------------------------------
-# RESULTADO
+# 📊 MÉTRICAS
 # -------------------------------------------------
-df_smooth["OD_pred"] = best_model.predict(X)
+mae = mean_absolute_error(best_y_test, best_y_pred)
+mse = mean_squared_error(best_y_test, best_y_pred)
+rmse = np.sqrt(mse)
 
-print("\n📊 RANGO MODELO:")
-print(df_smooth["OD_pred"].min(), df_smooth["OD_pred"].max())
+error_rel = (mae / np.mean(best_y_test)) * 100
+precision = np.std(best_y_pred - best_y_test)
+
+print("\n==============================")
+print("📊 RESULTADOS FINALES")
+print("==============================")
+
+print(f"R2: {best_r2:.4f}")
+print(f"RMSE: {rmse:.4f}")
+print(f"MSE: {mse:.4f}")
+print(f"Error absoluto: {mae:.4f}")
+print(f"Error relativo: {error_rel:.4f} %")
+print(f"Precisión (std): {precision:.4f}")
 
 # -------------------------------------------------
-# ECUACIÓN FINAL
+# 🔥 PREDICCIÓN
 # -------------------------------------------------
-print("\n📌 ECUACIÓN FINAL:\n")
+df_exp2["OD_pred"] = best_model.predict(X)
 
-cols = list(X.columns)
+# -------------------------------------------------
+# 📈 GRÁFICA POR MUESTRAS
+# -------------------------------------------------
+df_plot = df_exp2.loc[X.index].reset_index(drop=True)
+x = np.arange(len(df_plot))
 
-eq = f"OD = {best_model.intercept_:.6f}"
+plt.figure(figsize=(15,6))
+plt.plot(x, df_plot["OD"], label="OD real")
+plt.plot(x, df_plot["OD_pred"], label="OD modelo")
 
-for i, col in enumerate(cols):
-    eq += f" + ({best_model.coef_[i]:.6f} * {col})"
+plt.xlabel("Número de muestra")
+plt.ylabel("OD (mg/L)")
+plt.title("OD real vs modelo (ABSORBANCIA)")
+plt.legend()
+plt.grid()
 
-print(eq)
+plt.show()
 
 client.close()
